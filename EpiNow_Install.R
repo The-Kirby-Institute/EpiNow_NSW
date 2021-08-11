@@ -15,4 +15,4 @@ install.packages("covidregionaldata")
 # Other packages used
 install.packages("tidyverse")
 install.packages("lubridate")
-
+install.packages("future")
