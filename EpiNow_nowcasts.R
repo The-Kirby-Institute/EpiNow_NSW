@@ -1,0 +1,92 @@
+## Now casting script for running EpiNow2 on NSW COVID case data
+
+# Packages -----------------------------------------------------------------
+require(EpiNow2, quietly = TRUE)
+require(tidyverse, quietly = TRUE)
+require(lubridate, quietly = TRUE)
+
+# Functions ---------------------------------------------------------------
+source("GetCases.R")
+
+# Set options -------------------------------------------------------------
+regionLevel <- "LGA" # "NSW", "Sydney",  or "LGA"
+startDate <- "2021-06-01" # Filter to after this date (to speed up 
+                          # computation)
+dateRun <- NULL # Run to this date: NULL = last date in data file
+specificRegions <- keyLGAs # or specify a vector of regions
+resultsFolder <- "LGAs-concern"
+
+# Set-up outputs ----------------------------------------------------------
+if ((regionLevel == "LGA" & length(specificRegions) > 1) |
+    (regionLevel == "LGA" & specificRegions == "all")) {
+  regionalRun <- TRUE
+  epiFunction <- EpiNow2::regional_epinow
+} else {
+  regionalRun <- FALSE
+  epiFunction <- EpiNow2::epinow
+}
+
+dir.create(file.path("results", resultsFolder), showWarnings = FALSE)
+
+# Get raw case data -------------------------------------------------------
+print("Retrieving raw data from NSW Health...")
+
+nsw_data_url <- "https://data.nsw.gov.au/data/dataset/97ea2424-abaf-4f3e-a9f2-b5c883f42b6a/resource/2776dbb8-f807-4fb2-b1ed-184a6fc2c8aa/download/confirmed_cases_table4_location_likely_source.csv" 
+nsw_raw_cases <- read_csv(nsw_data_url)
+
+# Save raw data
+
+# Get cases we want -------------------------------------------------------
+
+print("Loading cases data ...")
+
+cases <- GetCases(nsw_raw_cases, regionLevel, startDate, 
+  regions = specificRegions)
+
+if(!is.null(dateRun)) {
+  cases <- cases %>% 
+    filter(date <= dateRun)
+}
+
+if (!regionalRun) {
+  cases <- cases %>%
+    select(-region)
+}
+
+# Load delays -------------------------------------------------------------
+print("Loading delay definitions ...")
+
+# TODO: Add code for local delay definitions
+reporting_delay <- list(mean = convert_to_logmean(4, 1),
+                        mean_sd = 0.1,
+                        sd = convert_to_logsd(4, 1),
+                        sd_sd = 0.1,
+                        max = 15)
+
+generation_time <- EpiNow2::get_generation_time(disease = "SARS-CoV-2", 
+  source = "ganyani")
+incubation_period <- EpiNow2::get_incubation_period(disease = "SARS-CoV-2", 
+  source = "lauer")
+
+# Set-up cores -------------------------------------------------------------
+# set number of cores to use fitting the model
+# no benefit on runtime if cores > chains which is set to 4 by default
+options(mc.cores = 4)
+
+# Run EpiNow --------------------------------------------------------------
+estimates <- epiFunction(reported_cases = cases, 
+  generation_time = generation_time,
+  delays = delay_opts(incubation_period, reporting_delay),
+  # Need to tweak prior for Rt I would think
+  rt = rt_opts(prior = list(mean = 1.5, sd = 0.5)),
+  stan = stan_opts(),
+  horizon = 14, 
+  target_folder = file.path("results", resultsFolder),
+  logs = file.path("logs", Sys.Date()),
+  return_output = TRUE, 
+  verbose = TRUE)
+
+# Summarise results -------------------------------------------------------
+summary(estimates)
+plot(estimates)
+summary(estimates, type = "parameters", params = "R")
