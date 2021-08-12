@@ -1,18 +1,24 @@
-## Now casting script for running EpiNow2 on NSW COVID case data
+# Now casting script for running EpiNow2 on NSW COVID case data
+# =============================================================
 
-# Packages ----------------------------------------------------------------
+```{r Set-up}
+# Open as a project (setting working directory to source and restarting R)
+
+# Packages
 require(EpiNow2, quietly = TRUE)
 require(tidyverse, quietly = TRUE)
 require(lubridate, quietly = TRUE)
 require(future, quietly = TRUE)
 
-# Functions ---------------------------------------------------------------
+# Functions 
 source("code/GetCases.R")
 source("code/LoadData.R")
 source("code/SpecifyRegions.R")
 source("code/RegionalSummary.R")
+```
 
-# User options ============================================================
+```{r User inputs}
+# Chunk where user enters all teh input options for running EpiNow
 regionLevel <- "LGA" # "NSW", "Sydney",  or "LGA"
 startDate <- "2021-06-01" # Filter to after this date (to speed up 
                           # computation)
@@ -21,11 +27,9 @@ regionOptions <- SpecifyRegions(regionLevel, "TestLGAs")
 specificRegions <- regionOptions[[1]]
 resultsFolder <- regionOptions[[2]] # or manually add
 dataOption <- "file" # "nsw_website" or "file"
+```
 
-
-# =========================================================================
-
-# Set-up outputs ----------------------------------------------------------
+```{r Set-up outputs}
 if ((regionLevel == "LGA" & length(specificRegions) > 1) |
     (regionLevel == "LGA" & specificRegions[1] == "all")) {
   regionalRun <- TRUE
@@ -36,8 +40,10 @@ if ((regionLevel == "LGA" & length(specificRegions) > 1) |
 }
 
 dir.create(file.path("results", resultsFolder), showWarnings = FALSE)
+```
 
-# Load raw case data ------------------------------------------------------
+```{r Sort out case data}
+# Load raw case data 
 print("Retrieving raw cases data...")
 nsw_raw_cases <- LoadData(dataOption)
 
@@ -46,7 +52,7 @@ if (dataOption == "nsw_website") {
   write_csv(nsw_raw_cases, file = file.path("data", 
     paste0("NSW_Health_Website_Data-", Sys.Date())))
 }
-# Get cases we want -------------------------------------------------------
+# Get cases we want 
 print("Getting cases...")
 
 cases <- GetCases(nsw_raw_cases, dataOption, regionLevel, startDate, 
@@ -62,8 +68,9 @@ if (!regionalRun) {
   cases <- reported_cases %>%
     select(-region)
 }
+```
 
-# Load delays -------------------------------------------------------------
+```{r Load EpiNow delay parameters}
 print("Loading delay definitions...")
 
 # TODO: Add code for local delay definitions
@@ -77,17 +84,18 @@ generation_time <- EpiNow2::get_generation_time(disease = "SARS-CoV-2",
   source = "ganyani")
 incubation_period <- EpiNow2::get_incubation_period(disease = "SARS-CoV-2", 
   source = "lauer")
+```
 
-# Set up cores ------------------------------------------------------------
+```{r Set-up simulations}
 print("Setting up EpiNow...")
 if (!interactive()){
   options(future.fork.enable = TRUE)
 }
 
 future::plan("multiprocess", workers = round(future::availableCores() / 2))
+```
 
-# Run EpiNow --------------------------------------------------------------
-
+```{r Run EpiNow}
 estimates <- epiFunction(reported_cases = cases, 
   generation_time = generation_time,
   delays = delay_opts(incubation_period, reporting_delay),
@@ -105,9 +113,9 @@ save(regionLevel, startDate, dateRun, specificRegions, cases, estimates,
   resultsFolder, generation_time, incubation_period, reporting_delay,
   file = file.path("results", resultsFolder, paste0("Epinow_results-", 
     format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))))
+```
 
-# Summarise results -------------------------------------------------------
-
+```{r Summarise results}
 # Commands for looking at individual region results
 # > summary(estimates)
 # > plot(estimates)
@@ -123,3 +131,5 @@ if (regionalRun) {
   RegionalSummary(estimates, resultsFolder)
   
 }
+
+```
