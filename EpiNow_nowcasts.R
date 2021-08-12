@@ -9,13 +9,14 @@ require(future, quietly = TRUE)
 # Functions ---------------------------------------------------------------
 source("code/GetCases.R")
 source("code/LoadData.R")
+source("code/SpecifyRegions.R")
 
 # Set options -------------------------------------------------------------
 regionLevel <- "LGA" # "NSW", "Sydney",  or "LGA"
 startDate <- "2021-06-01" # Filter to after this date (to speed up 
                           # computation)
 dateRun <- NULL # Run to this date: NULL = last date in data file
-specificRegions <- "all" # "all" or specify a vector of regions
+specificRegions <- SpecifyRegions("KeyLGAs") # "all" or specify a vector of regions
 resultsFolder <- "Test"
 dataOption <- "file" # "nsw_website" or "file"
 
