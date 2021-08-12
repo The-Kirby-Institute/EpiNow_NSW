@@ -22,18 +22,29 @@
 #' @export
 #' 
 #'  
-GetCases <- function(raw_data, region_level, start_date, regions = NULL) {
+GetCases <- function(raw_data, data_option, region_level, start_date, 
+  regions = NULL) {
   
   # Put raw data into right format
-  cases <- raw_data %>% 
-    select(date = notification_date, 
-      source = likely_source_of_infection, 
-      region = lga_name19) %>%
-    mutate(import_status = ifelse(source == "Overseas", "imported", 
-      "local")) %>%
-    filter(import_status == "local", date >= start_date) %>%
-    select(-source, -import_status)
-    
+  if (data_option == "nsw_website") {
+    cases <- raw_data %>% 
+      select(date = notification_date, 
+        source = likely_source_of_infection, 
+        region = lga_name19) %>%
+      mutate(import_status = ifelse(source == "Overseas", "imported", 
+        "local")) %>%
+      filter(import_status == "local", date >= start_date) %>%
+      select(-source, -import_status) 
+  } else if (data_option == "file") {
+    cases <- raw_data %>%
+      select(date = EARLIEST_CONFIRMED_OR_PROBABLE,
+        region = LGA_NAME_2020,
+        confirm = count)
+  } else {
+    stop("Unknown data option")
+  }
+  
+  # Aggregate cases to the right region level and format
   if (region_level == "NSW") {
     cases <- cases %>%
       group_by(date) %>%

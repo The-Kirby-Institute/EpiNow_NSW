@@ -7,15 +7,17 @@ require(lubridate, quietly = TRUE)
 require(future, quietly = TRUE)
 
 # Functions ---------------------------------------------------------------
-source("GetCases.R")
+source("code/GetCases.R")
+source("code/LoadData.R")
 
 # Set options -------------------------------------------------------------
 regionLevel <- "LGA" # "NSW", "Sydney",  or "LGA"
 startDate <- "2021-06-01" # Filter to after this date (to speed up 
                           # computation)
 dateRun <- NULL # Run to this date: NULL = last date in data file
-specificRegions <- keyLGAs # or specify a vector of regions
-resultsFolder <- "LGAs-concern"
+specificRegions <- "all" # "all" or specify a vector of regions
+resultsFolder <- "Test"
+dataOption <- "file" # "nsw_website" or "file"
 
 # Set-up outputs ----------------------------------------------------------
 if ((regionLevel == "LGA" & length(specificRegions) > 1) |
@@ -29,19 +31,14 @@ if ((regionLevel == "LGA" & length(specificRegions) > 1) |
 
 dir.create(file.path("results", resultsFolder), showWarnings = FALSE)
 
-# Get raw case data -------------------------------------------------------
-print("Retrieving raw data from NSW Health...")
-
-nsw_data_url <- "https://data.nsw.gov.au/data/dataset/97ea2424-abaf-4f3e-a9f2-b5c883f42b6a/resource/2776dbb8-f807-4fb2-b1ed-184a6fc2c8aa/download/confirmed_cases_table4_location_likely_source.csv" 
-nsw_raw_cases <- read_csv(nsw_data_url)
-
-# Save raw data
+# Load raw case data -------------------------------------------------------
+print("Retrieving raw cases data...")
+nsw_raw_cases <- LoadData(dataOption)
 
 # Get cases we want -------------------------------------------------------
+print("Getting cases...")
 
-print("Loading cases data ...")
-
-cases <- GetCases(nsw_raw_cases, regionLevel, startDate, 
+cases <- GetCases(nsw_raw_cases, dataOption, regionLevel, startDate, 
   regions = specificRegions)
 
 if(!is.null(dateRun)) {
@@ -55,7 +52,7 @@ if (!regionalRun) {
 }
 
 # Load delays -------------------------------------------------------------
-print("Loading delay definitions ...")
+print("Loading delay definitions...")
 
 # TODO: Add code for local delay definitions
 reporting_delay <- list(mean = convert_to_logmean(4, 1),
@@ -70,7 +67,7 @@ incubation_period <- EpiNow2::get_incubation_period(disease = "SARS-CoV-2",
   source = "lauer")
 
 # Set up cores ------------------------------------------------------------
-print("Setting up EpiNow ...")
+print("Setting up EpiNow...")
 if (!interactive()){
   options(future.fork.enable = TRUE)
 }
