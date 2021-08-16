@@ -20,7 +20,7 @@ SpecifyRegions <- function(level, option = "all") {
     regionList <- c("Campbelltown (C) (NSW)", "Fairfield (C)")
     regionFolder <- "Test-LGAs"
   } else {
-   stop("Uknown regions option") 
+   stop("Unknown regions option") 
   }
   
   return(list(regionList, regionFolder))

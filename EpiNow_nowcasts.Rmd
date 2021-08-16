@@ -23,7 +23,7 @@ regionLevel <- "LGA" # "NSW", "Sydney",  or "LGA"
 startDate <- "2021-06-01" # Filter to after this date (to speed up 
                           # computation)
 dateRun <- NULL # Run to this date: NULL = last date in data file
-regionOptions <- SpecifyRegions(regionLevel, "TestLGAs") 
+regionOptions <- SpecifyRegions(regionLevel, "all") 
 specificRegions <- regionOptions[[1]]
 resultsFolder <- regionOptions[[2]] # or manually add
 dataOption <- "nsw_website" # "nsw_website" or "file"
@@ -57,8 +57,7 @@ if (dataOption == "nsw_website") {
 print("Getting cases...")
 
 cases <- GetCases(nsw_raw_cases, dataOption, regionLevel, startDate, 
-  regions = specificRegions) %>%
-  arrange(region)
+  regions = specificRegions) 
 
 if(!is.null(dateRun)) {
   cases <- reported_cases %>% 
