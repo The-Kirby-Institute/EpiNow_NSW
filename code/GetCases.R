@@ -21,7 +21,6 @@
 #' 
 #' @export
 #' 
-#'  
 GetCases <- function(raw_data, data_option, region_level, start_date, 
   regions = NULL) {
   
@@ -62,12 +61,13 @@ GetCases <- function(raw_data, data_option, region_level, start_date,
       summarise(confirm = n()) %>%
       ungroup() %>%
       select(date, confirm, region) %>%
-      arrange(date)
+      arrange(date) %>%
+      arrange(region)
     
     if (!is.null(regions)) {
       if (regions[1] != "all") {
         cases <- cases %>%
-          dplyr::filter(region %in% regions)
+          dplyr::filter(region %in% regions) 
       }
     }
     
