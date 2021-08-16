@@ -26,7 +26,8 @@ dateRun <- NULL # Run to this date: NULL = last date in data file
 regionOptions <- SpecifyRegions(regionLevel, "TestLGAs") 
 specificRegions <- regionOptions[[1]]
 resultsFolder <- regionOptions[[2]] # or manually add
-dataOption <- "file" # "nsw_website" or "file"
+dataOption <- "nsw_website" # "nsw_website" or "file"
+delayOption <- "nsw_data" # nsw_data (dafault), "testing", "international"
 ```
 
 ```{r Set-up outputs}
@@ -73,12 +74,20 @@ if (!regionalRun) {
 ```{r Load EpiNow delay parameters}
 print("Loading delay definitions...")
 
-# TODO: Add code for local delay definitions
-reporting_delay <- list(mean = convert_to_logmean(4, 1),
-                        mean_sd = 0.1,
-                        sd = convert_to_logsd(4, 1),
-                        sd_sd = 0.1,
-                        max = 15)
+if (delayOption == "nsw_data") {
+  # Load delay_defs fitted from local nsw data
+  reporting_delay <- readRDS("data/local_delays.rds")
+} else if (delayOption == "testing") {
+  reporting_delay <- list(mean = convert_to_logmean(4, 1),
+    mean_sd = 0.1,
+    sd = convert_to_logsd(4, 1),
+    sd_sd = 0.1,
+    max = 15)
+} else if (delayOption == "international") {
+  v <- readRDS("data/international_delays.rds")
+} else {
+  stop("Unknown lineData option")
+}
 
 generation_time <- EpiNow2::get_generation_time(disease = "SARS-CoV-2", 
   source = "ganyani")
@@ -102,14 +111,14 @@ estimates <- epiFunction(reported_cases = cases,
   # Need to tweak prior for Rt I would think
   rt = rt_opts(prior = list(mean = 1.5, sd = 0.5)),
   stan = stan_opts(),
-  horizon = 14, 
   target_folder = file.path("results", resultsFolder),
   logs = file.path("logs", Sys.Date()),
   return_output = TRUE, 
   verbose = TRUE)
 
 # Save everything in the results folder
-save(regionLevel, startDate, dateRun, specificRegions, cases, estimates,
+save(regionLevel, startDate, dateRun, specificRegions, dataOption, 
+  delayOption, cases, estimates,
   resultsFolder, generation_time, incubation_period, reporting_delay,
   file = file.path("results", resultsFolder, paste0("Epinow_results-", 
     format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))))
