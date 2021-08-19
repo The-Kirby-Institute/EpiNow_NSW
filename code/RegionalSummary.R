@@ -6,7 +6,7 @@ RegionalSummary <- function(output, folder) {
     target_date = "latest"
     summary_dir =  file.path(results_dir, "regional-summary", "latest")
     
-    EpiNow2::regional_summary(
+    regional_summary_NSW(
       regional_output = output$regional,
       reported_cases = output$summary$reported_cases,
       summary_dir = summary_dir,

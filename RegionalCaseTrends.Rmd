@@ -28,8 +28,9 @@ startDate <- "2021-06-01" # Filter to after this date
 dateRun <- NULL # Filter to before this date: NULL = last date in data file
 
 # Specify region
-regionLevel <- "LGA" # "NSW", "Sydney",  or "LGA"
-regionName <- "Burwood (A)"   # If not "NSW" or "Sydney" then single LGA
+regionLevel <- "NSW" # "NSW", "Sydney",  or "LGA"
+regionName <- "Waverley (A)"   # If not "NSW" or "Sydney" 
+                                       # then single LGA
                               # E.g. "Fairfield (C)", "Sutherland Shire (A)"
 # unique(sort(nsw_raw_cases$lga_name19)) 
 ```
@@ -38,7 +39,7 @@ regionName <- "Burwood (A)"   # If not "NSW" or "Sydney" then single LGA
 # Will produce error if there are no cases
 cases <- GetCases(nsw_raw_cases, dataOption, regionLevel, startDate, 
   regions = regionName) %>%
-  select(-region) %>%
+  # select(-region) %>%
   # Fill in missing dates with zeros
   left_join(tibble(date = as_date(ymd(min(.$date)):ymd(max(.$date))),
     confirm = 0), ., by = "date") %>%
@@ -52,7 +53,7 @@ cases <- GetCases(nsw_raw_cases, dataOption, regionLevel, startDate,
 
 ```{r Plot of cases}
 plotTitle <- ifelse(regionLevel == "LGA", regionName, regionLevel)
-regionPlot <- casesRegionPlot(cases, plotTitle)
+regionPlot <- CasesPlot(cases, plotTitle)
 
 regionPlot
 ```
@@ -89,7 +90,7 @@ segModel1 <- segmented(trendCases, seg.Z = ~day,
 ymax <-1.1*max(cases$confirm)
 
 segPlot <- ggplot(data = cases, 
-  aes(x = date, y = confirm)) + 
+  aes(x = date, y = confirm)) +
   geom_line(aes(color = "cases")) + 
   geom_point(color = "red") +
   geom_line(aes(y = fitted(trendCases), colour = "overall")) +
@@ -99,7 +100,7 @@ segPlot <- ggplot(data = cases,
     limits = c("cases", "overall", "segment"),
     labels = c("Cases", "Overall model",
       "Segmented model")) +
-  ylab("Daily cases") + xlab("Date") +  
+  labs(x = "Date", y = "Daily cases", title = plotTitle) +
   PlotOptions() +
   geom_vline(xintercept = cases$date[1] + (segModel1$psi[2]-1), 
       linetype = "dashed",
