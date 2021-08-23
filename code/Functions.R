@@ -31,3 +31,55 @@ CasesPlot <- function(cases_data, plot_title) {
   return(plot)
   
 }
+
+####
+
+GetKeyEstimates <- function(estimates, regional, region = NULL) {
+   
+  if(regional) {
+    output <- estimates$summary$results$estimates$summarised %>%
+  filter(region == "Sutherland Shire (A)") 
+  } else {
+    output <- estimates$estimates$summarised
+  }
+  
+  return(output)
+  
+}
+
+GetKeyResults <- function(output, indicator) {
+  
+  keyIndicators <- c("R", "growth_rate", "infections", "reported_cases")
+  
+  if (indicator %in% keyIndicators) {
+    
+    return(output %>% 
+        filter(variable == indicator) %>% 
+        select(-strat, -type)) 
+  } else {
+    stop("Indicator entered not a key indicator") 
+  }
+}
+
+SaveKeyResults <- function(results, output_dir, indicator) {
+  
+  filename <- ifelse(indicator == "R", "rt", indicator)
+  
+  data.table::fwrite(results,file.path(output_dir, paste0(filename, ".csv")))
+  
+  return(invisible(NULL))
+}
+
+SaveAllIndicators <- function(key_estimates, output_dir, output_date) {
+  
+  keyIndicators <- c("R", "growth_rate", "infections", "reported_cases")
+  
+  for (indicator in keyIndicators) {
+    SaveKeyResults(
+      GetKeyResults(key_estimates, indicator), 
+      file.path(output_dir, output_date), 
+      indicator)
+  }
+  
+  return(invisible(NULL))
+}
