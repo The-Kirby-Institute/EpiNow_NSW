@@ -1,7 +1,7 @@
 #' Regional Summary Output for NSW
 #'
 #' @description 
-#' Tweak of EpiNow regional_summary()  to produce summary output for NSW.
+#' Tweak of EpiNow regional_summary() to produce summary output for NSW.
 #' 
 #' @param summary_dir A character string giving the directory
 #'  in which to store summary of results.
@@ -172,7 +172,7 @@ regional_summary_NSW <- function(regional_output = NULL,
   
   summary_plot_NSW <- plot_summary_NSW(summarised_results$data,
     x_lab = region_scale,
-    log_cases = log_cases,
+    log_cases = FALSE,
     max_cases = max_reported_cases,
     reported_cases = reported_cases
   )
