@@ -1,8 +1,7 @@
-#' Retrive raw nsw case data
+#' Retrieve raw NSW case data
 #' 
 #' 
-LoadData <- function(option, data_file = "data/Date_LGA_cases.csv", 
-  save_data = FALSE, 
+LoadData <- function(option, data_file, save_data = FALSE, 
   save_file = "data/") {
   
   if (option == "file") {

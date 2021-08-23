@@ -35,17 +35,18 @@ GetCases <- function(raw_data, data_option, region_level, start_date,
       filter(import_status == "local", date >= start_date) %>%
       select(-source, -import_status) 
   } else if (data_option == "file") {
-    cases <- raw_data %>%
-      select(date = EARLIEST_CONFIRMED_OR_PROBABLE,
-        region = LGA_NAME_2020,
-        confirm = count)
+    # Need to tweak this to whatever file you are using
+    # cases <- raw_data %>%
+    #   select(date = EARLIEST_CONFIRMED_OR_PROBABLE,
+    #     region = LGA_NAME_2020,
+    #     confirm = count)
   } else {
     stop("Unknown data option")
   }
   
-  # Aggregate cases to the right region level and format
+  # Aggregate cases to get overall NSW cases
   if (region_level == "NSW") {
-    cases <- cases %>%
+   cases <- cases %>%
       group_by(date) %>%
       summarise(confirm = n()) %>%
       ungroup() %>%
