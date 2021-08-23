@@ -8,11 +8,8 @@
 #' 
 #' @param raw_data Data frame with raw cases data acquire from NSW COVID
 #' datasets website. 
-#' @param region_level String specify level of region can be "NSW", 
-#' "Sydney", or "LGA" TODO: LHD, postcode?
-#' @param date_run Date specify date EpiNow will run to.
-#' @param regions Vector of strings specifying regions of interest. 
-#' Default is "all" which means all regions are included. 
+#' @param date_option 
+#' @param start_date Date specifying date EpiNow will run from.
 #' 
 #' @return Date table with 3 columns: date, confirm, region (dropped if
 #' only one region)
@@ -21,8 +18,7 @@
 #' 
 #' @export
 #' 
-GetCases <- function(raw_data, data_option, region_level, start_date, 
-  regions = NULL) {
+GetCases <- function(raw_data, data_option, start_date) {
   
   # Put raw data into right format
   if (data_option == "nsw_website") {
@@ -44,38 +40,28 @@ GetCases <- function(raw_data, data_option, region_level, start_date,
     stop("Unknown data option")
   }
   
-  # Aggregate cases to get overall NSW cases
-  if (region_level == "NSW") {
-   cases <- cases %>%
-      group_by(date) %>%
-      summarise(confirm = n()) %>%
-      ungroup() %>%
-      select(date, confirm) %>%
-      arrange(date)
-    
-  } else if (region_level == "Sydney") {
-    # TODO
-    # sydenyLGAs <- c()
-  } else if (region_level == "LGA") {
-    cases <- cases %>%
+  # First aggregate cases by LGA
+  cases <- cases %>%
       group_by(date, region) %>%
       summarise(confirm = n()) %>%
       ungroup() %>%
       select(date, confirm, region) %>%
       arrange(date) %>%
       arrange(region)
-    
-    if (!is.null(regions)) {
-      if (regions[1] != "all") {
-        cases <- cases %>%
-          dplyr::filter(region %in% regions) 
-      }
-    }
-    
-  } else {
-    stop("Unknown region level option")
-  }
   
+  # Then aggregate cases to get overall NSW cases
+   nswCases <- cases %>%
+      group_by(date) %>%
+      summarise(confirm = sum(confirm)) %>%
+      ungroup() %>%
+      mutate(region = "NSW") %>%
+      arrange(date)
+  
+  # TODO: Add aggregates for Sydney LGAs and regional LGAs 
+   
+  # Merge
+  cases <- cases %>% bind_rows(nswCases)
+
   return(cases)
   
 }

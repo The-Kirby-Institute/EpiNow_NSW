@@ -1,15 +1,11 @@
 #' Select specific regions for EpiNow estimates and corresponding results
 #' folder.
 #' 
-SpecifyRegions <- function(level, option = "all") {
-  
-  if (level %in% c("NSW", "Sydney")) {
-    option == "all"
-  }
-  
+SpecifyRegions <- function(option = "all") {
+
   if (option == "all") {
     regionList <- "all"
-    regionFolder <- level
+    regionFolder <- "All"
   } else if (option == "KeyLGAs") {
     regionList <- c("Campbelltown (C) (NSW)", "Blacktown (C)",
       "Fairfield (C)", "Canterbury-Bankstown (A)", "Liverpool (C)",
@@ -19,6 +15,11 @@ SpecifyRegions <- function(level, option = "all") {
   } else if (option == "TestLGAs") {
     regionList <- c("Campbelltown (C) (NSW)", "Fairfield (C)")
     regionFolder <- "Test-LGAs"
+  } else if (option == "manual") {  
+    # Do nothing and enter manually
+    regionList <- NULL
+    regionFolder <- NULL
+    print("Enter regions and results folder manually")
   } else {
    stop("Unknown regions option") 
   }

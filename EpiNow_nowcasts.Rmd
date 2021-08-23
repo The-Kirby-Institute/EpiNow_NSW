@@ -11,39 +11,33 @@ require(lubridate, quietly = TRUE)
 require(future, quietly = TRUE)
 
 # Functions 
-source("code/GetCases.R")
 source("code/LoadData.R")
+source("code/GetCases.R")
 source("code/SpecifyRegions.R")
 source("code/RegionalSummary.R")
 source("code/regional_summary_NSW.R")
 source("code/plot_summary_NSW.R")
 source("code/RegionsCumulativeReports.R")
+source("code/Functions.R")
 ```
 
 ```{r User inputs}
 # Chunk where user enters all the input options for running EpiNow2
-regionLevel <- "NSW" # "NSW", "Sydney",  or "LGA"
-startDate <- "2021-06-01" # Filter to after this date (to speed up 
-                          # computation)
+# regionLevel <- "NSW" # "NSW", "Sydney",  or "LGA"
+
 dateRun <- NULL # Run to this date: NULL = last date in data file
-regionOptions <- SpecifyRegions(regionLevel, "all") 
-specificRegions <- regionOptions[[1]]
-resultsFolder <- regionOptions[[2]] # or manually add
+startDate <- "2021-06-01" # Filter to after this date (to speed up 
+# computation)
+
 dataOption <- "nsw_website" # "nsw_website" or "file"
 delayOption <- "nsw_data" # nsw_data (default), "testing", "international"
-```
 
-```{r Set-up outputs}
-if ((regionLevel == "LGA" & length(specificRegions) > 1) |
-    (regionLevel == "LGA" & specificRegions[1] == "all")) {
-  regionalRun <- TRUE
-  epiFunction <- EpiNow2::regional_epinow
-} else {
-  regionalRun <- FALSE
-  epiFunction <- EpiNow2::epinow
-}
+specificRegions <- SpecifyRegions("all")[[1]]
+resultsFolder <- SpecifyRegions("all")[[2]] 
 
-dir.create(file.path("results", resultsFolder), showWarnings = FALSE)
+# specificRegions <- c("NSW", "Sutherland Shire (A)")
+# resultsFolder <- "Testing"
+
 ```
 
 ```{r Sort out case data}
@@ -59,14 +53,35 @@ if (dataOption == "nsw_website") {
 # Get cases we want 
 print("Getting cases...")
 
-cases <- GetCases(nsw_raw_cases, dataOption, regionLevel, startDate, 
-  regions = specificRegions) 
+cases <- GetCases(nsw_raw_cases, dataOption, startDate) 
 
+# Filter out dates we don't need
 if(!is.null(dateRun)) {
   cases <- cases %>% 
     filter(date <= dateRun)
 }
 
+# Filter out regions we are not interested in
+if (specificRegions[1] != "all") {
+  cases <- cases %>%
+    filter(region %in% specificRegions)
+} 
+
+```
+
+```{r Set-up outputs}
+# Separate out specific regions
+nswCases <- filter(cases, region == "NSW")
+#sydneyCases <- filter(cases, region == "Sydney")
+#regionalCases <- filter(cases, region == "Regional")
+lgaCases <- filter(cases, !(region %in% c("NSW", "Sydney", "Regional")))
+lgaRegions <- unique(lgaCases$region)
+
+multiLGArun <- ifelse(length(lgaRegions) > 1, TRUE, FALSE)
+
+dateCases <- max(cases$date)
+
+dir.create(file.path("results", resultsFolder), showWarnings = FALSE)
 ```
 
 ```{r Load EpiNow delay parameters}
@@ -104,20 +119,108 @@ future::plan("multiprocess", workers = round(future::availableCores() / 2))
 ```
 
 ```{r Run EpiNow}
-estimates <- epiFunction(reported_cases = cases, 
-  generation_time = generation_time,
-  delays = delay_opts(incubation_period, reporting_delay),
-  # Using default Rt prior
-  rt = rt_opts(prior = list(mean = 1, sd = 0.5)),
-  stan = stan_opts(),
-  target_folder = file.path("results", resultsFolder),
-  logs = file.path("logs", Sys.Date()),
-  return_output = TRUE, 
-  verbose = TRUE)
+# Initialize
+nswEstimates <- NULL
+# sydneyEstimates <- NULL
+# regionalEstimates <- NULL
+lgaEstimates <- NULL
 
+print("Running EpiNow...")
+
+# Run Epinow
+if (nrow(nswCases) != 0) {
+  print("Generating NSW estimates...")
+  nswEstimates <- EpiNow2::epinow(
+    reported_cases =  dplyr::select(nswCases, -region), 
+    generation_time = generation_time,
+    delays = delay_opts(incubation_period, reporting_delay),
+    # Using default Rt prior
+    rt = rt_opts(prior = list(mean = 1, sd = 0.5)),
+    stan = stan_opts(),
+    target_folder = file.path("results", resultsFolder, "NSW"),
+    logs = file.path("logs", Sys.Date()),
+    return_output = TRUE, 
+    verbose = TRUE
+  )
+  
+  # Run function to save CSV file of key indicators 
+  keyEstimates <- GetKeyEstimates(nswEstimates, multiLGArun)
+  
+  SaveAllIndicators(keyEstimates, 
+    file.path("results", resultsFolder, "NSW"),
+    dateCases)
+  SaveAllIndicators(keyEstimates, 
+    file.path("results", resultsFolder, "NSW"), 
+    "latest")
+}
+
+# TODO add Sydney
+# TODO add regional
+
+if (multiLGArun) {
+  # More than one LGA so run regional epinow
+  print("Generating Multiple LGA estimates...")
+  lgaEstimates <- EpiNow2::regional_epinow(reported_cases = lgaCases, 
+    generation_time = generation_time,
+    delays = delay_opts(incubation_period, reporting_delay),
+    # Using default Rt prior
+    rt = rt_opts(prior = list(mean = 1, sd = 0.5)),
+    stan = stan_opts(),
+    target_folder = file.path("results", resultsFolder),
+    logs = file.path("logs", Sys.Date()),
+    return_output = TRUE, 
+    verbose = TRUE)
+  
+  print("Producing LGA summary ...")
+  
+  RegionalSummary(lgaEstimates, resultsFolder, dateCases) 
+  
+  # Run function to save CSV file of key indicators for each region
+  for (region in names(lgaEstimates$regional)) {
+    regionEstimates <- GetKeyEstimates(lgaEstimates, multiLGArun, region)
+    
+    SaveAllIndicators(regionEstimates, 
+      file.path("results", file.path(resultsFolder, region)),
+      dateCases)
+    SaveAllIndicators(regionEstimates, 
+      file.path("results", file.path(resultsFolder, region)), 
+      "latest")
+  }
+  
+} else {
+  # 0 or 1 LGAs in lgaRegions
+  if (nrow(lgaCases) != 0) {
+    print("Generating Single LGA estimates...")
+    lgaEstimates <- EpiNow2::epinow(
+      reported_cases = dplyr::select(lgaCases, -region),
+      generation_time = generation_time,
+      delays = delay_opts(incubation_period, reporting_delay),
+      # Using default Rt prior
+      rt = rt_opts(prior = list(mean = 1, sd = 0.5)),
+      stan = stan_opts(),
+      target_folder = file.path("results", resultsFolder,
+        lgaRegions),
+      logs = file.path("logs", Sys.Date()),
+      return_output = TRUE, 
+      verbose = TRUE)
+    
+    # Run function to save CSV file of key indicators 
+    keyEstimates <- GetKeyEstimates(lgaEstimates, multiLGArun)
+    
+    SaveAllIndicators(keyEstimates, 
+      file.path("results", resultsFolder, lgaRegions),
+      dateCases)
+    SaveAllIndicators(keyEstimates, 
+      file.path("results", resultsFolder, lgaRegions), 
+      "latest")
+    
+  } 
+}
+
+print("Tidying up...")
 # Save everything in the results folder just in case
 save(regionLevel, startDate, dateRun, specificRegions, dataOption, 
-  delayOption, cases, estimates,
+  delayOption, cases, nswEstimates, LGAestimates,
   resultsFolder, generation_time, incubation_period, reporting_delay,
   file = file.path("results", resultsFolder, paste0("Epinow_results-", 
     format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".rds")))
@@ -128,39 +231,5 @@ save(regionLevel, startDate, dateRun, specificRegions, dataOption,
 # > summary(estimates)
 # > plot(estimates)
 # > summary(estimates, type = "parameters", params = "R")
-
-# For regional results we can generate a regional summary
-if (regionalRun) {
-  # The following command won't run if some regions do not have all the 
-  # results files. If you strike an error check that all the result folders 
-  # and files have been generated by EpiNow. 
-  print("Producing regional summary ...")
-  
-  RegionalSummary(estimates, resultsFolder) 
-  
-  # Run function to save CSV file of key indicators for each region
-  for (region in cases$region) {
-    regionEstimates <- GetKeyEstimates(estimates, regionalRun, region)
-    
-    SaveAllIndicators(regionEstimates, 
-      file.path("results", file.path(resultsFolder, region)),
-      max(cases$date))
-    SaveAllIndicators(regionEstimates, 
-      file.path("results", file.path(resultsFolder, region)), 
-      "latest")
-  }
-} else {
- 
-  # Run function to save CSV file of key indicators 
-  keyEstimates <- GetKeyEstimates(estimates, regionalRun)
-  
-  SaveAllIndicators(keyEstimates, 
-    file.path("results", resultsFolder),
-    max(cases$date))
-  SaveAllIndicators(keyEstimates, 
-    file.path("results", resultsFolder), 
-    "latest")
-
-}
-
 ```
+
