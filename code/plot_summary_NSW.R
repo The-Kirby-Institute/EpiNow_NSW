@@ -129,7 +129,8 @@ plot_summary_NSW <- function(summary_results, x_lab = "Region",
   rt_data <- left_join(rt_data, RegionsCumulativeReports(reported_cases),
     by = "region") %>%
     arrange(confirm) %>%
-    mutate(region = factor(region, levels = .$region))
+    # Arrange LGAs in the same way as for reported weekly cases
+    mutate(region = factor(region, levels = reported_weekly_cases$region))
   
   uppers <- grepl("upper_", colnames(rt_data))
   max_rt <- max(data.table::copy(rt_data)[, ..uppers], na.rm = TRUE)
