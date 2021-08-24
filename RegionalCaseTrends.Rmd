@@ -28,18 +28,18 @@ startDate <- "2021-06-01" # Filter to after this date
 dateRun <- NULL # Filter to before this date: NULL = last date in data file
 
 # Specify region
-regionLevel <- "NSW" # "NSW", "Sydney",  or "LGA"
-regionName <- "Waverley (A)"   # If not "NSW" or "Sydney" 
-                                       # then single LGA
-                              # E.g. "Fairfield (C)", "Sutherland Shire (A)"
-# unique(sort(nsw_raw_cases$lga_name19)) 
+lgaNames <- unique(sort(nsw_raw_cases$lga_name19)) # for reference 
+
+# Specify region if not "NSW" or "Sydney" hen single LGA "Fairfield (C)", "Sutherland Shire (A)"
+regionName <- "NSW"   
+                              
 ```
 
 ```{r Get region cases data}
 # Will produce error if there are no cases
-cases <- GetCases(nsw_raw_cases, dataOption, regionLevel, startDate, 
-  regions = regionName) %>%
-  # select(-region) %>%
+cases <- GetCases(nsw_raw_cases, dataOption, startDate) %>%
+  filter(region == regionName) %>%
+  select(-region) %>%
   # Fill in missing dates with zeros
   left_join(tibble(date = as_date(ymd(min(.$date)):ymd(max(.$date))),
     confirm = 0), ., by = "date") %>%
@@ -127,14 +127,14 @@ TP <- function(a, g, d, k) {
 }
 
 # To find good initial conditions requires guessing and checking 
-regionPlot + 
-  geom_line(aes(y = FitModel(1:51, 0.1, 0.49, 0.055, 200)), 
-    colour = "dark green")
-
-# Now run nls() to produce a non-linear model.
-fitModel <- nls(confirm ~ FitModel(day, a, g, d, k), data = cases, 
-  start = list(a = 0.1, g = 0.49, d = 0.055, k = 200),
-  control = nls.control(maxiter = 1000))
+# regionPlot + 
+#   geom_line(aes(y = FitModel(1:nrow(cases), 0.1, 0.49, 0.055, 200)), 
+#     colour = "dark green")
+# 
+# # Now run nls() to produce a non-linear model.
+# fitModel <- nls(confirm ~ FitModel(day, a, g, d, k), data = cases, 
+#   start = list(a = 0.1, g = 0.49, d = 0.055, k = 200),
+#   control = nls.control(maxiter = 1000))
 
 
 

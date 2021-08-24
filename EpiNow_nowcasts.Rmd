@@ -23,20 +23,20 @@ source("code/Functions.R")
 
 ```{r User inputs}
 # Chunk where user enters all the input options for running EpiNow2
-# regionLevel <- "NSW" # "NSW", "Sydney",  or "LGA"
 
 dateRun <- NULL # Run to this date: NULL = last date in data file
-startDate <- "2021-06-01" # Filter to after this date (to speed up 
-# computation)
+startDate <- "2021-06-01" # Filter to after this date (speeds things up) 
 
+# Specify where the case data is coming from see LoadData() function for 
+# details. 
 dataOption <- "nsw_website" # "nsw_website" or "file"
 delayOption <- "nsw_data" # nsw_data (default), "testing", "international"
 
+# Specify which regions will be inputed into EpiNow and where the results 
+# will be stored in the results/ folder. These can be entered manually
+# or via the use of the SpecifyRegions() function. 
 specificRegions <- SpecifyRegions("all")[[1]]
 resultsFolder <- SpecifyRegions("all")[[2]] 
-
-# specificRegions <- c("NSW", "Sutherland Shire (A)")
-# resultsFolder <- "Testing"
 
 ```
 
@@ -45,11 +45,12 @@ resultsFolder <- SpecifyRegions("all")[[2]]
 print("Retrieving raw cases data...")
 nsw_raw_cases <- LoadData(dataOption)
 
-# Save website data
+# Save website data for later
 if (dataOption == "nsw_website") {
   write_csv(nsw_raw_cases, file = file.path("data", 
     paste0("NSW_Health_Website_Data-", Sys.Date())))
 }
+
 # Get cases we want 
 print("Getting cases...")
 
@@ -70,10 +71,13 @@ if (specificRegions[1] != "all") {
 ```
 
 ```{r Set-up outputs}
-# Separate out specific regions
+# This chunk sets up cases, variables, and output details for EpiNow 
+
+# Separate out specific aggregate regions
 nswCases <- filter(cases, region == "NSW")
-#sydneyCases <- filter(cases, region == "Sydney")
-#regionalCases <- filter(cases, region == "Regional")
+#TODO: sydneyCases <- filter(cases, region == "Sydney")
+#TODO: regionalCases <- filter(cases, region == "Regional")
+
 lgaCases <- filter(cases, !(region %in% c("NSW", "Sydney", "Regional")))
 lgaRegions <- unique(lgaCases$region)
 
@@ -84,11 +88,12 @@ dateCases <- max(cases$date)
 dir.create(file.path("results", resultsFolder), showWarnings = FALSE)
 ```
 
-```{r Load EpiNow delay parameters}
+```{r Load EpiNow delay parameters and rt prior}
 print("Loading delay definitions...")
 
 if (delayOption == "nsw_data") {
-  # Load delay_defs fitted from local NSW data
+  # Load delay_defs fitted from local NSW data. This needs to be generated
+  # separately using the EpiNow_update_delay.R script.
   reporting_delay <- readRDS("data/local_delays.rds")
 } else if (delayOption == "international") {
   # Out of date delay estimate from international sources
@@ -107,6 +112,12 @@ generation_time <- EpiNow2::get_generation_time(disease = "SARS-CoV-2",
   source = "ganyani")
 incubation_period <- EpiNow2::get_incubation_period(disease = "SARS-CoV-2", 
   source = "lauer")
+
+# Specify prior for RT. Currently assumed to be low given the presence of
+# restrictions with some LGAs having no cases. We use this assumed prior 
+# to prevent EpiNow forecasting massive increases in cases when numbers
+# are small.  
+rtPrior <- rt_opts(prior = list(mean = 1, sd = 0.5))
 ```
 
 ```{r Set-up simulations}
@@ -119,7 +130,7 @@ future::plan("multiprocess", workers = round(future::availableCores() / 2))
 ```
 
 ```{r Run EpiNow}
-# Initialize
+# Initialize outputs for aggregate regions and LGAs
 nswEstimates <- NULL
 # sydneyEstimates <- NULL
 # regionalEstimates <- NULL
@@ -127,15 +138,15 @@ lgaEstimates <- NULL
 
 print("Running EpiNow...")
 
-# Run Epinow
+# Run EpiNow for NSW separately
 if (nrow(nswCases) != 0) {
   print("Generating NSW estimates...")
   nswEstimates <- EpiNow2::epinow(
+    # Need to remove region column from cases for this to run
     reported_cases =  dplyr::select(nswCases, -region), 
     generation_time = generation_time,
     delays = delay_opts(incubation_period, reporting_delay),
-    # Using default Rt prior
-    rt = rt_opts(prior = list(mean = 1, sd = 0.5)),
+    rt = rtPrior,
     stan = stan_opts(),
     target_folder = file.path("results", resultsFolder, "NSW"),
     logs = file.path("logs", Sys.Date()),
@@ -157,14 +168,14 @@ if (nrow(nswCases) != 0) {
 # TODO add Sydney
 # TODO add regional
 
+# Run EpiNow for LGAs
 if (multiLGArun) {
-  # More than one LGA so run regional epinow
+  # More than one LGA so run regional version of EpiNow
   print("Generating Multiple LGA estimates...")
   lgaEstimates <- EpiNow2::regional_epinow(reported_cases = lgaCases, 
     generation_time = generation_time,
     delays = delay_opts(incubation_period, reporting_delay),
-    # Using default Rt prior
-    rt = rt_opts(prior = list(mean = 1, sd = 0.5)),
+    rt = rtPrior,
     stan = stan_opts(),
     target_folder = file.path("results", resultsFolder),
     logs = file.path("logs", Sys.Date()),
@@ -173,6 +184,8 @@ if (multiLGArun) {
   
   print("Producing LGA summary ...")
   
+  # Produce LGA summary results.
+  # Stored in ./results/`resultsFolder`/LGA-summary/ 
   RegionalSummary(lgaEstimates, resultsFolder, dateCases) 
   
   # Run function to save CSV file of key indicators for each region
@@ -190,13 +203,14 @@ if (multiLGArun) {
 } else {
   # 0 or 1 LGAs in lgaRegions
   if (nrow(lgaCases) != 0) {
+    # Single LGA so run normal EpiNow
     print("Generating Single LGA estimates...")
     lgaEstimates <- EpiNow2::epinow(
+      # Need to remove region column from cases for this to run
       reported_cases = dplyr::select(lgaCases, -region),
       generation_time = generation_time,
       delays = delay_opts(incubation_period, reporting_delay),
-      # Using default Rt prior
-      rt = rt_opts(prior = list(mean = 1, sd = 0.5)),
+      rt = rtPrior,
       stan = stan_opts(),
       target_folder = file.path("results", resultsFolder,
         lgaRegions),
@@ -213,7 +227,6 @@ if (multiLGArun) {
     SaveAllIndicators(keyEstimates, 
       file.path("results", resultsFolder, lgaRegions), 
       "latest")
-    
   } 
 }
 
