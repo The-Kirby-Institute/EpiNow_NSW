@@ -31,7 +31,7 @@ dateRun <- NULL # Filter to before this date: NULL = last date in data file
 lgaNames <- unique(sort(nsw_raw_cases$lga_name19)) # for reference 
 
 # Specify region if not "NSW" or "Sydney" hen single LGA "Fairfield (C)", "Sutherland Shire (A)"
-regionName <- "NSW"   
+regionName <- "Sutherland Shire (A)" #"NSW"   
                               
 ```
 
@@ -52,7 +52,7 @@ cases <- GetCases(nsw_raw_cases, dataOption, startDate) %>%
 ```
 
 ```{r Plot of cases}
-plotTitle <- ifelse(regionLevel == "LGA", regionName, regionLevel)
+plotTitle <- regionName
 regionPlot <- CasesPlot(cases, plotTitle)
 
 regionPlot

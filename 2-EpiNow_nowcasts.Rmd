@@ -232,8 +232,8 @@ if (multiLGArun) {
 
 print("Tidying up...")
 # Save everything in the results folder just in case
-save(regionLevel, startDate, dateRun, specificRegions, dataOption, 
-  delayOption, cases, nswEstimates, LGAestimates,
+save(startDate, dateRun, specificRegions, dataOption, 
+  delayOption, cases, nswEstimates, lgaEstimates,
   resultsFolder, generation_time, incubation_period, reporting_delay,
   file = file.path("results", resultsFolder, paste0("Epinow_results-", 
     format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".rds")))

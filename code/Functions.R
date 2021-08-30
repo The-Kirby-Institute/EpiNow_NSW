@@ -34,11 +34,11 @@ CasesPlot <- function(cases_data, plot_title) {
 
 ####
 
-GetKeyEstimates <- function(estimates, regional, region = NULL) {
+GetKeyEstimates <- function(estimates, regional, regionName = NULL) {
    
   if(regional) {
     output <- estimates$summary$results$estimates$summarised %>%
-  filter(region == "Sutherland Shire (A)") 
+      filter(region == regionName) 
   } else {
     output <- estimates$estimates$summarised
   }

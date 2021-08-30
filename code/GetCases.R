@@ -42,26 +42,29 @@ GetCases <- function(raw_data, data_option, start_date) {
   
   # First aggregate cases by LGA
   cases <- cases %>%
-      group_by(date, region) %>%
-      summarise(confirm = n()) %>%
-      ungroup() %>%
-      select(date, confirm, region) %>%
-      arrange(date) %>%
-      arrange(region)
+    group_by(date, region) %>%
+    summarise(confirm = n()) %>%
+    ungroup() %>%
+    select(date, confirm, region) %>%
+    arrange(date) %>%
+    arrange(region)
   
-  # Then aggregate cases to get overall NSW cases
-   nswCases <- cases %>%
-      group_by(date) %>%
-      summarise(confirm = sum(confirm)) %>%
-      ungroup() %>%
-      mutate(region = "NSW") %>%
-      arrange(date)
+  # Aggregate cases to get overall NSW cases
+  nswCases <- cases %>%
+    group_by(date) %>%
+    summarise(confirm = sum(confirm)) %>%
+    ungroup() %>%
+    mutate(region = "NSW") %>%
+    arrange(date)
   
-  # TODO: Add aggregates for Sydney LGAs and regional LGAs 
-   
+  # Aggregate cases to get overall in Sydney
+  
+  # Aggregate cases to get overall in regional LGAs
+  
   # Merge
-  cases <- cases %>% bind_rows(nswCases)
-
+  cases <- cases %>% 
+    bind_rows(nswCases)
+  
   return(cases)
   
 }
