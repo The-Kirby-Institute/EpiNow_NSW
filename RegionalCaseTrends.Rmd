@@ -30,8 +30,9 @@ dateRun <- NULL # Filter to before this date: NULL = last date in data file
 # Specify region
 lgaNames <- unique(sort(nsw_raw_cases$lga_name19)) # for reference 
 
-# Specify region if not "NSW" or "Sydney" hen single LGA "Fairfield (C)", "Sutherland Shire (A)"
-regionName <- "Sutherland Shire (A)" #"NSW"   
+# Specify region if not "NSW", "Greater Sydney", "Regional", or single LGA
+# e.g. "Fairfield (C)", "Sutherland Shire (A)"
+regionName <- "NSW" #"NSW" "All Regional NSW"  
                               
 ```
 
