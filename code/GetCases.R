@@ -101,15 +101,16 @@ GetCases <- function(raw_data, data_option, start_date) {
     arrange(date)
   
   westernCases <- cases %>%
-    filter(region %in% filter(regionalLGAs, group == "west_region_lhd ")$lga) %>%
+    filter(region %in% filter(regionalLGAs, group == "west_region_lhd")$lga) %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
     ungroup() %>%
     mutate(region = "Western NSW") %>%
     arrange(date)
   
+  
   southernCases <- cases %>%
-    filter(region %in% filter(regionalLGAs, group == "south_region_lhd  ")$lga) %>%
+    filter(region %in% filter(regionalLGAs, group == "south_region_lhd")$lga) %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
     ungroup() %>%
