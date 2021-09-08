@@ -57,13 +57,73 @@ GetCases <- function(raw_data, data_option, start_date) {
     mutate(region = "NSW") %>%
     arrange(date)
   
-  # Aggregate cases to get overall in Sydney
+  # Aggregate cases to get overall in Greater Sydney
+  
+  greaterSydLGAs <- c("Bayside (A)", "Blacktown (C)", "Blue Mountains (C)", 
+    "Burwood (A)", "Camden (A)", "Campbelltown (C) (NSW)", "Canada Bay (A)", 
+    "Canterbury-Bankstown (A)", "Central Coast (C) (NSW)", 
+    "Cumberland (A)", "Fairfield (C)", "Georges River (A)", "Hawkesbury (C)", 
+    "Hornsby (A)", "Hunters Hill (A)", "Inner West (A)", "Ku-ring-gai (A)", 
+    "Lane Cove (A)", "Liverpool (C)", "Mosman (A)", "North Sydney (A)", 
+    "Northern Beaches (A)", "Parramatta (C)", "Penrith (C)", "Randwick (C)", 
+    "Ryde (C)", "Strathfield (A)", "Sutherland Shire (A)", "Sydney (C)", 
+    "The Hills Shire (A)", "Waverley (A)", "Willoughby (C)", "Wollondilly (A)", 
+    "Wollongong (C)", "Woollahra (A)")
+  
+  sydneyCases <- cases %>%
+    filter(region %in% greaterSydLGAs) %>%
+    group_by(date) %>%
+    summarise(confirm = sum(confirm)) %>%
+    ungroup() %>%
+    mutate(region = "Greater Sydney") %>%
+    arrange(date)
   
   # Aggregate cases to get overall in regional LGAs
+  regionalCases <- cases %>%
+    filter(!(region %in% greaterSydLGAs)) %>%
+    group_by(date) %>%
+    summarise(confirm = sum(confirm)) %>%
+    ungroup() %>%
+    mutate(region = "All Regional NSW") %>%
+    arrange(date)
+  
+  # Sub-regional areas
+  regionalLGAs <- read_csv("data/list_regionalLHDs_LGA.csv", 
+    show_col_types = FALSE) %>%
+    select(group = grouplhd, lhd = LHD_NAME, lga = LGA_NAME_2020)
+  
+  northernCases <- cases %>%
+    filter(region %in% filter(regionalLGAs, group == "north_region_lhd")$lga) %>%
+    group_by(date) %>%
+    summarise(confirm = sum(confirm)) %>%
+    ungroup() %>%
+    mutate(region = "Northern NSW") %>%
+    arrange(date)
+  
+  westernCases <- cases %>%
+    filter(region %in% filter(regionalLGAs, group == "west_region_lhd ")$lga) %>%
+    group_by(date) %>%
+    summarise(confirm = sum(confirm)) %>%
+    ungroup() %>%
+    mutate(region = "Western NSW") %>%
+    arrange(date)
+  
+  southernCases <- cases %>%
+    filter(region %in% filter(regionalLGAs, group == "south_region_lhd  ")$lga) %>%
+    group_by(date) %>%
+    summarise(confirm = sum(confirm)) %>%
+    ungroup() %>%
+    mutate(region = "Southern NSW") %>%
+    arrange(date)
   
   # Merge
   cases <- cases %>% 
-    bind_rows(nswCases)
+    bind_rows(nswCases) %>%
+    bind_rows(sydneyCases) %>%
+    bind_rows(regionalCases) %>%
+    bind_rows(northernCases) %>%
+    bind_rows(westernCases) %>%
+    bind_rows(southernCases)
   
   return(cases)
   
