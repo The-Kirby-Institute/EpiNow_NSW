@@ -77,7 +77,7 @@ plot_summary_NSW <- function(summary_results, x_lab = "Region",
   
   # check max_cases
   upper_CrI <- paste0("upper_", max_CrI)
-  max_upper <- max(summary_results[metric %in% "New confirmed cases by infection date"][, ..upper_CrI],
+  max_upper <- max(summary_results[metric %in% "New confirmed cases by infection date"]$median, #[, ..upper_CrI],
     na.rm = TRUE)
   max_cases <- min(c(max_cases, max_upper + 1), na.rm = TRUE)
   
@@ -112,14 +112,14 @@ plot_summary_NSW <- function(summary_results, x_lab = "Region",
     reported_plot <- reported_plot +
       ggplot2::scale_x_log10(
         labels = scales::comma,
-        limits = c(NA, ifelse(!missing(max_cases), max_cases, NA)),
+        limits = c(NA, ifelse(!missing(max_cases), max_cases * 7, NA)),
         oob = scales::squish
       )
   } else {
     reported_plot <- reported_plot +
       ggplot2::scale_x_continuous(
         labels = scales::comma,
-        limits = c(NA, ifelse(!missing(max_cases), max_cases, NA)),
+        limits = c(NA, ifelse(!missing(max_cases), max_cases * 7, NA)),
         oob = scales::squish
       )
   }
