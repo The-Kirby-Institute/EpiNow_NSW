@@ -8,8 +8,9 @@
 # Packages ----------------------------------------------------------------
 
 require(data.table, quietly = TRUE)
+require(tidyverse, quietly = TRUE)
 require(EpiNow2, quietly = TRUE)
-require(lubridate, quietly = TRUE)
+# require(lubridate, quietly = TRUE)
 
 source("code/PlotOPtions.R")
 
