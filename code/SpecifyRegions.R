@@ -27,6 +27,14 @@ SpecifyRegions <- function(option = "all") {
   } else if (option == "TestLGAs") {
     regionList <- c("Campbelltown (C) (NSW)", "Fairfield (C)")
     regionFolder <- "Test-LGAs"
+  } else if (option == "postcode") { 
+    regionList <- as.character(c(2170, 2161, 2770, 2144, 2200, 2190, 2168, 2160, 2196, 
+      2142, 2145, 2148, 2162, 2199, 2760, 2165, 2830, 2761, 2195, 2560, 
+      2197, 2198, 2176, 2747, 2166, 2163, 2141, 2767, 2164, 2150, 2171, 2147, 
+      2210, 2017, 2565, 2750, 2016, 2035, 2768, 2135, 2207, 2036, 2566, 2570,
+      2192, 2177, 2117, 2212, 2765, 2759, 2143, 2261, 2763, 2766, 2567, 2151, 
+      2209, 2564, 2140, 2211, 2000))
+    regionFolder <- "Postcodes"
   } else if (option == "manual") {  
     # Do nothing and enter manually
     regionList <- NULL

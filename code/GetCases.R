@@ -25,7 +25,8 @@ GetCases <- function(raw_data, data_option, start_date) {
     cases <- raw_data %>% 
       select(date = notification_date, 
         source = likely_source_of_infection, 
-        region = lga_name19) %>%
+        region = lga_name19,
+        postcode) %>%
       mutate(import_status = ifelse(source == "Overseas", "imported", 
         "local")) %>%
       filter(import_status == "local", date >= start_date) %>%
@@ -40,8 +41,8 @@ GetCases <- function(raw_data, data_option, start_date) {
     stop("Unknown data option")
   }
   
-  # First aggregate cases by LGA
-  cases <- cases %>%
+  # First aggregate cases by LGA 
+  casesLga <- cases %>%
     group_by(date, region) %>%
     summarise(confirm = n()) %>%
     ungroup() %>%
@@ -49,8 +50,18 @@ GetCases <- function(raw_data, data_option, start_date) {
     arrange(date) %>%
     arrange(region)
   
+  # Separately aggregate cases by postcode
+  casesPostcode <- cases %>%
+    group_by(date, postcode) %>%
+    summarise(confirm = n()) %>%
+    ungroup() %>%
+    select(date, confirm, region = postcode) %>%
+    mutate(region = as.character(region)) %>%
+    arrange(date) %>%
+    arrange(region)
+  
   # Aggregate cases to get overall NSW cases
-  nswCases <- cases %>%
+  nswCases <- casesLga %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
     ungroup() %>%
@@ -70,7 +81,7 @@ GetCases <- function(raw_data, data_option, start_date) {
     "The Hills Shire (A)", "Waverley (A)", "Willoughby (C)", "Wollondilly (A)", 
     "Wollongong (C)", "Woollahra (A)")
   
-  sydneyCases <- cases %>%
+  sydneyCases <- casesLga %>%
     filter(region %in% greaterSydLGAs) %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
@@ -79,7 +90,7 @@ GetCases <- function(raw_data, data_option, start_date) {
     arrange(date)
   
   # Aggregate cases to get overall in regional LGAs
-  regionalCases <- cases %>%
+  regionalCases <- casesLga %>%
     filter(!(region %in% greaterSydLGAs)) %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
@@ -89,10 +100,10 @@ GetCases <- function(raw_data, data_option, start_date) {
   
   # Sub-regional areas
   regionalLGAs <- read_csv("data/list_regionalLHDs_LGA.csv", 
-    show_col_types = FALSE) %>%
-    select(group = grouplhd, lhd = LHD_NAME, lga = LGA_NAME_2020)
+    col_types = cols_only(grouplhd = "c", LHD_NAME = "c", LGA_NAME_2020 ="c")) %>%
+    rename(group = grouplhd, lhd = LHD_NAME, lga = LGA_NAME_2020)
   
-  northernCases <- cases %>%
+  northernCases <- casesLga %>%
     filter(region %in% filter(regionalLGAs, group == "north_region_lhd")$lga) %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
@@ -100,7 +111,7 @@ GetCases <- function(raw_data, data_option, start_date) {
     mutate(region = "Northern NSW") %>%
     arrange(date)
   
-  westernCases <- cases %>%
+  westernCases <- casesLga %>%
     filter(region %in% filter(regionalLGAs, group == "west_region_lhd")$lga) %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
@@ -109,7 +120,7 @@ GetCases <- function(raw_data, data_option, start_date) {
     arrange(date)
   
   
-  southernCases <- cases %>%
+  southernCases <- casesLga %>%
     filter(region %in% filter(regionalLGAs, group == "south_region_lhd")$lga) %>%
     group_by(date) %>%
     summarise(confirm = sum(confirm)) %>%
@@ -117,14 +128,17 @@ GetCases <- function(raw_data, data_option, start_date) {
     mutate(region = "Southern NSW") %>%
     arrange(date)
   
-  # Merge
-  cases <- cases %>% 
+  # Merge LGA and region level cases and return with postcode in a list
+  cases <- list()
+  cases[[1]] <- casesLga %>% 
     bind_rows(nswCases) %>%
     bind_rows(sydneyCases) %>%
     bind_rows(regionalCases) %>%
     bind_rows(northernCases) %>%
     bind_rows(westernCases) %>%
     bind_rows(southernCases)
+  
+  cases[[2]] <- casesPostcode
   
   return(cases)
   
