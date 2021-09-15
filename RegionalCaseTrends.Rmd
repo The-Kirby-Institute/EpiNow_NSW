@@ -9,6 +9,8 @@ require(tidyverse, quietly = TRUE)
 require(lubridate, quietly = TRUE)
 require(segmented, quietly = TRUE)
 
+options(dplyr.summarise.inform=FALSE)
+
 # Functions 
 source("code/GetCases.R")
 source("code/LoadData.R")
@@ -32,13 +34,13 @@ lgaNames <- unique(sort(nsw_raw_cases$lga_name19)) # for reference
 
 # Specify region if not "NSW", "Greater Sydney", "Regional", or single LGA
 # e.g. "Fairfield (C)", "Sutherland Shire (A)"
-regionName <- "NSW" #"NSW" "All Regional NSW"  
+regionName <- "Sutherland Shire (A)" # "NSW" "All Regional NSW"  
                               
 ```
 
 ```{r Get region cases data}
 # Will produce error if there are no cases
-cases <- GetCases(nsw_raw_cases, dataOption, startDate) %>%
+cases <- GetCases(nsw_raw_cases, dataOption, startDate)[[1]] %>%
   filter(region == regionName) %>%
   select(-region) %>%
   # Fill in missing dates with zeros
