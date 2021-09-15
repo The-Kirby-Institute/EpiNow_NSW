@@ -209,7 +209,7 @@ regional_summary_NSW <- function(regional_output = NULL,
   # extract regions with highest number of reported cases in the last week
   most_reports <- get_regions_with_most_reports(reported_cases,
     time_window = 7,
-    no_regions = 6
+    no_regions = 10
   )
 
   high_plots <- report_plots(
