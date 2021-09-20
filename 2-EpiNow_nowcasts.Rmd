@@ -10,6 +10,8 @@ require(tidyverse, quietly = TRUE)
 require(lubridate, quietly = TRUE)
 require(future, quietly = TRUE)
 
+options(dplyr.summarise.inform=FALSE)
+
 # Functions 
 source("code/LoadData.R")
 source("code/GetCases.R")
@@ -25,7 +27,7 @@ source("code/Functions.R")
 # Chunk where user enters all the input options for running EpiNow2
 
 dateRun <- NULL # Run to this date: NULL = last date in data file
-startDate <- "2021-06-01" # Filter to after this date (speeds things up) 
+startDate <- "2021-08-01" # Filter to after this date (speeds things up) 
 
 # Specify where the case data is coming from see LoadData() function for 
 # details. 
@@ -36,12 +38,19 @@ delayOption <- "nsw_data" # nsw_data (default), "testing", "international"
 # will be stored in the results/ folder. These can be entered manually
 # or via the use of the SpecifyRegions() function. 
 
-# specificRegions <- SpecifyRegions("all")[[1]]
-specificRegions <- c("NSW", "Greater Sydney", "Northern NSW",
-  "Western NSW", "Southern NSW")
-resultsFolder <- SpecifyRegions("all")[[2]] 
+postcodeRun <- TRUE
 
-# Produce summary comaprsion results for regions and LGAs
+if (postcodeRun) {
+  specificRegions <- SpecifyRegions("postcode")[[1]]
+  resultsFolder <- SpecifyRegions("postcode")[[2]]
+} else {
+  specificRegions <- SpecifyRegions("all")[[1]]
+  specificRegions <- c("NSW", "Greater Sydney") #, "Northern NSW",
+  #   "Western NSW", "Southern NSW")
+  resultsFolder <- SpecifyRegions("all")[[2]] 
+}
+
+# Produce summary comparison results for regions, LGAs, and postcodes
 summariseResults <- TRUE
 
 ```
@@ -60,7 +69,28 @@ if (dataOption == "nsw_website") {
 # Get cases we want 
 print("Getting cases...")
 
-cases <- GetCases(nsw_raw_cases, dataOption, startDate) 
+# Load postcode and locality file
+
+casesAll <- GetCases(nsw_raw_cases, dataOption, startDate) 
+
+
+if (postcodeRun) {
+  cases <- casesAll[[2]] 
+  
+  dateCases <- max(cases$date)
+  
+  postcodes <- read_csv(paste0("data/postcode_suburb_name-", 
+    dateCases, ".csv"), show_col_types = FALSE) %>%
+    select(postcode = Postcode, name = ...4) %>% 
+    mutate(region = as.character(postcode))
+  
+  specificRegions <- postcodes$postcode
+  
+} else {
+  cases <- casesAll[[1]]
+  
+  dateCases <- max(cases$date)
+}   
 
 # Filter out dates we don't need
 if(!is.null(dateRun)) {
@@ -74,6 +104,11 @@ if (specificRegions[1] != "all") {
     filter(region %in% specificRegions)
 } 
 
+if (postcodeRun) {
+  # Convert postcode numbers to names
+  cases <- left_join(cases, postcodes, by = "region") %>%
+    select(date, confirm, postcode, region = name)
+}
 ```
 
 ```{r Set-up outputs}
@@ -81,17 +116,19 @@ if (specificRegions[1] != "all") {
 aggregateRegions <- c("NSW", "Greater Sydney", "Northern NSW",
   "Western NSW", "Southern NSW", "All Regional NSW")
 
-# Separate out LGA and aggregate regions
-regionCases <- filter(cases, region %in% aggregateRegions)
-lgaCases <- filter(cases, !(region %in% aggregateRegions))
-
-multiRegions <- unique(regionCases$region)
-multiRegionRun <- ifelse(length(multiRegions) > 1, TRUE, FALSE)
-
-multiLGAs <- unique(lgaCases$region)
-multiLGArun <- ifelse(length(multiLGAs) > 1, TRUE, FALSE)
-
-dateCases <- max(cases$date)
+# Separate out LGA and aggregate regions if not postcode run
+if (!postcodeRun) {
+  regionCases <- filter(cases, region %in% aggregateRegions)
+  lgaCases <- filter(cases, !(region %in% aggregateRegions))
+  
+  multiRegions <- unique(regionCases$region)
+  multiRegionRun <- ifelse(length(multiRegions) > 1, TRUE, FALSE)
+  
+  multiLGAs <- unique(lgaCases$region)
+  multiLGArun <- ifelse(length(multiLGAs) > 1, TRUE, FALSE)
+} else {
+  postcodeCases <- cases
+}
 
 dir.create(file.path("results", resultsFolder), showWarnings = FALSE)
 ```
@@ -138,143 +175,177 @@ future::plan("multiprocess", workers = round(future::availableCores() / 2))
 ```
 
 ```{r Run EpiNow}
-# Initialize outputs for aggregate regions and LGAs
+# Initialize outputs for aggregate regions, LGAs, and postcodes
 regionEstimates <- NULL
 lgaEstimates <- NULL
+postcodeEstimates <- NULL
 
 print("Running EpiNow...")
 
-# Run EpiNow for aggregate regions
-if (multiRegionRun) {
-  # More than one aggregate region so run regional version of EpiNow
-  print("Generating multiple aggregate region estimates...")
-  regionEstimates <- EpiNow2::regional_epinow(reported_cases = regionCases, 
-    generation_time = generation_time,
-    delays = delay_opts(incubation_period, reporting_delay),
-    rt = rtPrior,
-    stan = stan_opts(),
-    target_folder = file.path("results", resultsFolder),
-    logs = file.path("logs", Sys.Date()),
-    return_output = TRUE, 
-    verbose = TRUE)
-
-  # Produce aggregate region summary results.
-  # Stored in ./results/`resultsFolder`/Regions-summary/ 
-  if (summariseResults) {
-    print("Producing aggregate region summary ...")
-    RegionalSummary(regionEstimates, resultsFolder, "Regions-summary", dateCases) 
-  }
-  
-  # Run function to save CSV file of key indicators for each region
-  for (region in names(regionEstimates$regional)) {
-    keyEstimates <- GetKeyEstimates(regionEstimates, multiRegionRun, region)
-    
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", file.path(resultsFolder, region)),
-      dateCases)
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", file.path(resultsFolder, region)), 
-      "latest")
-  }
-  
-} else {
-  # 0 or 1 regions in multiRegions
-  if (nrow(regionCases) != 0) {
-    # Single region so run normal EpiNow
-    print("Generating Single LGA estimates...")
-    regionEstimates <- EpiNow2::epinow(
-      # Need to remove region column from cases for this to run
-      reported_cases = dplyr::select(regionCases, -region),
+if (!postcodeRun) {
+  # Run EpiNow for aggregate regions
+  if (multiRegionRun) {
+    # More than one aggregate region so run regional version of EpiNow
+    print("Generating multiple aggregate region estimates...")
+    regionEstimates <- EpiNow2::regional_epinow(reported_cases = regionCases, 
       generation_time = generation_time,
       delays = delay_opts(incubation_period, reporting_delay),
       rt = rtPrior,
       stan = stan_opts(),
-      target_folder = file.path("results", resultsFolder,
-        lgaRegions),
+      target_folder = file.path("results", resultsFolder),
       logs = file.path("logs", Sys.Date()),
       return_output = TRUE, 
       verbose = TRUE)
     
-    # Run function to save CSV file of key indicators 
-    keyEstimates <- GetKeyEstimates(regionEstimates, FALSE)
+    # Produce aggregate region summary results.
+    # Stored in ./results/`resultsFolder`/Regions-summary/ 
+    if (summariseResults) {
+      print("Producing aggregate region summary ...")
+      RegionalSummary(regionEstimates, resultsFolder, "Regions-summary", dateCases) 
+    }
     
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", resultsFolder, multiRegions),
-      dateCases)
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", resultsFolder, multiRegions), 
-      "latest")
-  } 
-}
-
-# Run EpiNow for LGAs
-if (multiLGArun) {
-  # More than one LGA so run regional version of EpiNow
-  print("Generating Multiple LGA estimates...")
-  lgaEstimates <- EpiNow2::regional_epinow(reported_cases = lgaCases, 
-    generation_time = generation_time,
-    delays = delay_opts(incubation_period, reporting_delay),
-    rt = rtPrior,
-    stan = stan_opts(),
-    target_folder = file.path("results", resultsFolder),
-    logs = file.path("logs", Sys.Date()),
-    return_output = TRUE, 
-    verbose = TRUE)
-
-  # Produce LGA summary results.
-  # Stored in ./results/`resultsFolder`/LGA-summary/ 
-  if (summariseResults) {
+    # Run function to save CSV file of key indicators for each region
+    for (region in names(regionEstimates$regional)) {
+      keyEstimates <- GetKeyEstimates(regionEstimates, multiRegionRun, region)
       
-    print("Producing LGA summary ...")
-    RegionalSummary(lgaEstimates, resultsFolder, "LGA-summary", dateCases) 
-  }
-  
-  # Run function to save CSV file of key indicators for each region
-  for (region in names(lgaEstimates$regional)) {
-    keyEstimates <- GetKeyEstimates(lgaEstimates, multiLGArun, region)
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", file.path(resultsFolder, region)),
+        dateCases)
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", file.path(resultsFolder, region)), 
+        "latest")
+    }
     
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", file.path(resultsFolder, region)),
-      dateCases)
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", file.path(resultsFolder, region)), 
-      "latest")
+  } else {
+    # 0 or 1 regions in multiRegions
+    if (nrow(regionCases) != 0) {
+      # Single region so run normal EpiNow
+      print("Generating Single LGA estimates...")
+      regionEstimates <- EpiNow2::epinow(
+        # Need to remove region column from cases for this to run
+        reported_cases = dplyr::select(regionCases, -region),
+        generation_time = generation_time,
+        delays = delay_opts(incubation_period, reporting_delay),
+        rt = rtPrior,
+        stan = stan_opts(),
+        target_folder = file.path("results", resultsFolder,
+          lgaRegions),
+        logs = file.path("logs", Sys.Date()),
+        return_output = TRUE, 
+        verbose = TRUE)
+      
+      # Run function to save CSV file of key indicators 
+      keyEstimates <- GetKeyEstimates(regionEstimates, FALSE)
+      
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", resultsFolder, multiRegions),
+        dateCases)
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", resultsFolder, multiRegions), 
+        "latest")
+    } 
   }
   
-} else {
-  # 0 or 1 LGAs in lgaRegions
-  if (nrow(lgaCases) != 0) {
-    # Single LGA so run normal EpiNow
-    print("Generating Single LGA estimates...")
-    lgaEstimates <- EpiNow2::epinow(
-      # Need to remove region column from cases for this to run
-      reported_cases = dplyr::select(lgaCases, -region),
+  # Run EpiNow for LGAs
+  if (multiLGArun) {
+    # More than one LGA so run regional version of EpiNow
+    print("Generating Multiple LGA estimates...")
+    lgaEstimates <- EpiNow2::regional_epinow(reported_cases = lgaCases, 
       generation_time = generation_time,
       delays = delay_opts(incubation_period, reporting_delay),
       rt = rtPrior,
       stan = stan_opts(),
-      target_folder = file.path("results", resultsFolder,
-        lgaRegions),
+      target_folder = file.path("results", resultsFolder),
       logs = file.path("logs", Sys.Date()),
       return_output = TRUE, 
       verbose = TRUE)
     
-    # Run function to save CSV file of key indicators 
-    keyEstimates <- GetKeyEstimates(lgaEstimates, FALSE)
+    # Produce LGA summary results.
+    # Stored in ./results/`resultsFolder`/LGA-summary/ 
+    if (summariseResults) {
+      
+      print("Producing LGA summary ...")
+      RegionalSummary(lgaEstimates, resultsFolder, "LGA-summary", dateCases) 
+    }
     
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", resultsFolder, lgaRegions),
-      dateCases)
-    SaveAllIndicators(keyEstimates, 
-      file.path("results", resultsFolder, lgaRegions), 
-      "latest")
-  } 
+    # Run function to save CSV file of key indicators for each region
+    for (region in names(lgaEstimates$regional)) {
+      keyEstimates <- GetKeyEstimates(lgaEstimates, multiLGArun, region)
+      
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", file.path(resultsFolder, region)),
+        dateCases)
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", file.path(resultsFolder, region)), 
+        "latest")
+    }
+    
+  } else {
+    # 0 or 1 LGAs in lgaRegions
+    if (nrow(lgaCases) != 0) {
+      # Single LGA so run normal EpiNow
+      print("Generating Single LGA estimates...")
+      lgaEstimates <- EpiNow2::epinow(
+        # Need to remove region column from cases for this to run
+        reported_cases = dplyr::select(lgaCases, -region),
+        generation_time = generation_time,
+        delays = delay_opts(incubation_period, reporting_delay),
+        rt = rtPrior,
+        stan = stan_opts(),
+        target_folder = file.path("results", resultsFolder,
+          lgaRegions),
+        logs = file.path("logs", Sys.Date()),
+        return_output = TRUE, 
+        verbose = TRUE)
+      
+      # Run function to save CSV file of key indicators 
+      keyEstimates <- GetKeyEstimates(lgaEstimates, FALSE)
+      
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", resultsFolder, lgaRegions),
+        dateCases)
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", resultsFolder, lgaRegions), 
+        "latest")
+    } 
+  }
+} else {
+   print("Generating Postcode estimates...")
+    postcodeEstimates <- EpiNow2::regional_epinow(reported_cases = postcodeCases, 
+      generation_time = generation_time,
+      delays = delay_opts(incubation_period, reporting_delay),
+      rt = rtPrior,
+      stan = stan_opts(),
+      target_folder = file.path("results", resultsFolder),
+      logs = file.path("logs", Sys.Date()),
+      return_output = TRUE, 
+      verbose = TRUE)
+    
+    # Produce LGA summary results.
+    # Stored in ./results/`resultsFolder`/LGA-summary/ 
+    if (summariseResults) {
+      
+      print("Producing postcodes summary ...")
+      RegionalSummary(postcodeEstimates, resultsFolder, "Postcode-summary", dateCases) 
+    }
+    
+    # Run function to save CSV file of key indicators for each region
+    for (region in names(postcodeEstimates$regional)) {
+      keyEstimates <- GetKeyEstimates(postcodeEstimates, TRUE, region)
+      
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", file.path(resultsFolder, region)),
+        dateCases)
+      SaveAllIndicators(keyEstimates, 
+        file.path("results", file.path(resultsFolder, region)), 
+        "latest")
+    }
 }
 
 print("Tidying up...")
 # Save everything in the results folder just in case
 save(startDate, dateRun, specificRegions, dataOption, 
-  delayOption, cases, regionEstimates, lgaEstimates,
+  delayOption, cases, regionEstimates, lgaEstimates, postcodeEstimates, 
   resultsFolder, generation_time, incubation_period, reporting_delay,
   file = file.path("results", resultsFolder, paste0("Epinow_results-", 
     format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".rds")))
