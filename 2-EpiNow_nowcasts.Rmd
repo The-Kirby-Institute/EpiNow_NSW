@@ -27,7 +27,7 @@ source("code/Functions.R")
 # Chunk where user enters all the input options for running EpiNow2
 
 dateRun <- NULL # Run to this date: NULL = last date in data file
-startDate <- "2021-08-01" # Filter to after this date (speeds things up) 
+startDate <- "2021-09-15" # Filter to after this date (speeds things up) 
 
 # Specify where the case data is coming from see LoadData() function for 
 # details. 
@@ -38,16 +38,19 @@ delayOption <- "nsw_data" # nsw_data (default), "testing", "international"
 # will be stored in the results/ folder. These can be entered manually
 # or via the use of the SpecifyRegions() function. 
 
-postcodeRun <- TRUE
+postcodeRun <- FALSE
 
 if (postcodeRun) {
   specificRegions <- SpecifyRegions("postcode")[[1]]
   resultsFolder <- SpecifyRegions("postcode")[[2]]
 } else {
   specificRegions <- SpecifyRegions("all")[[1]]
-  specificRegions <- c("NSW", "Greater Sydney") #, "Northern NSW",
-  #   "Western NSW", "Southern NSW")
-  resultsFolder <- SpecifyRegions("all")[[2]] 
+  # specificRegions <- c("NSW", "Greater Sydney", "Northern NSW",
+    # "Western NSW", "Southern NSW")
+  resultsFolder <- SpecifyRegions("all")[[2]]
+  # specificRegions <- c("Cessnock (C)", "Lake Macquarie (C)", "Maitland (C)",
+  #   "Newcastle (C)", "Port Stephens (A)", "Singleton (A)")
+  # resultsFolder <- "Hunter_New_England"
 }
 
 # Produce summary comparison results for regions, LGAs, and postcodes
@@ -77,12 +80,15 @@ casesAll <- GetCases(nsw_raw_cases, dataOption, startDate)
 if (postcodeRun) {
   cases <- casesAll[[2]] 
   
-  dateCases <- max(cases$date)
+  dateCases <- max(cases$date) # Need to check to make sure postcode
+                               # file name correct
   
   postcodes <- read_csv(paste0("data/postcode_suburb_name-", 
     dateCases, ".csv"), show_col_types = FALSE) %>%
-    select(postcode = Postcode, name = ...4) %>% 
-    mutate(region = as.character(postcode))
+    # select(postcode = Postcode, name = ...4) %>% 
+    mutate(region = as.character(postcode), 
+      name = paste0(as.character(postcode), "-", 
+      str_replace(name, "/","_")))
   
   specificRegions <- postcodes$postcode
   
@@ -107,7 +113,7 @@ if (specificRegions[1] != "all") {
 if (postcodeRun) {
   # Convert postcode numbers to names
   cases <- left_join(cases, postcodes, by = "region") %>%
-    select(date, confirm, postcode, region = name)
+    select(date, confirm, region = name)
 }
 ```
 
@@ -307,7 +313,7 @@ if (!postcodeRun) {
       SaveAllIndicators(keyEstimates, 
         file.path("results", resultsFolder, lgaRegions), 
         "latest")
-    } 
+    }
   }
 } else {
    print("Generating Postcode estimates...")
