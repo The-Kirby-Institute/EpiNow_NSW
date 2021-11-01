@@ -1,0 +1,99 @@
+# Script for collating results from all LGAs over time
+# =======================================================
+
+```{r setup}
+# Open as a project (setting working directory to source and restarting R)
+
+# Packages
+require(tidyverse, quietly = TRUE)
+require(lubridate, quietly = TRUE)
+
+options(dplyr.summarise.inform=FALSE)
+
+# Functions 
+source("code/GetCases.R")
+source("code/LoadData.R")
+source("code/SpecifyRegions.R")
+# source("code/Functions.R") 
+
+resultsFolder <- "results/"
+
+```
+
+```{r User inputs}
+# Retrieve cases
+dataOption <- "nsw_website" 
+
+# Case dates
+startDate <- "2021-06-01" # Filter to after this date 
+
+# Regions option - lga, aggregate, postcodes
+# regionsOption <- "lga"
+
+```
+
+```{r Get the data}
+nsw_raw_cases <- LoadData(dataOption)
+lgaNames <- unique(sort(nsw_raw_cases$lga_name19)) # for reference all lgas 
+# that have ever had a 
+# case
+lastDate <- max(nsw_raw_cases$notification_date)    
+
+# casesAll <- GetCases(nsw_raw_cases, dataOption, startDate) 
+
+```
+
+```{r Setup dates and folders}
+
+dates <- as_date(as_date(startDate):as_date(lastDate))
+
+# if (regionsOption == "lga") {
+lgaFolder <- file.path(resultsFolder, "All")
+resultNames <- list.files(path = lgaFolder)
+resultNames <- resultNames[resultNames %in% lgaNames]
+# } else if (regionsOption == "aggregate") {
+#   resultsFolder <- file.path(resultsFolder, "All")
+#   # TODO
+# } else if (regionsOption == "postcodes") {
+#   resultsFolder <- file.path(resultsFolder, "Postcode")
+#   # TODO
+# } else {
+#   error("Unknown option") 
+# }
+
+```
+
+```{r Extract Rt results}
+
+resultsRt <- tibble()
+
+for (folder in resultNames) {
+  if (!(folder %in% c("Bogan (A)", "Coonamble (A)", "Lismore (C)",
+    "Upper Hunter Shire (A)"))) {
+    print(folder)
+    tempRt <- read_csv(file.path(lgaFolder, folder, "latest","rt.csv")) %>%
+      right_join(tibble(date = dates), by = "date") %>%
+      arrange(date) %>%
+      select(-variable) %>%
+      select(date, everything()) %>%
+      mutate(region = folder)   
+    
+    resultsRt <- resultsRt %>%
+      bind_rows(tempRt)
+  }
+}
+
+medianResults <- resultsRt %>%
+  select(date, region, median) %>%
+  spread(region, median)
+
+```
+
+```{r Write results to file}
+write_csv(resultsRt, file.path(resultsFolder, "Collated_LGA_Rt.csv"))
+write_csv(medianResults, file.path(resultsFolder,
+  "Collated_LGA_Rt_median.csv"))
+
+```
+
+
