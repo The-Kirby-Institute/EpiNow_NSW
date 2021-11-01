@@ -2,31 +2,31 @@
 #' folder.
 #' 
 SpecifyRegions <- function(option = "all") {
-
+  
   if (option == "all") {
     regionList <- "all"
     regionFolder <- "All"
-  } else if (option == "KeyLGAs") {
-    regionList <- c("Campbelltown (C) (NSW)", "Blacktown (C)",
-      "Fairfield (C)", "Canterbury-Bankstown (A)", "Liverpool (C)",
-      "Georges River (A)", "Parramatta (C)", "Cumberland (A)",
-      "Penrith (C)")
-    regionFolder <- "LGAs-concern"
-  } else if (option == "Sydney") {
+  } else if (option == "metro_lgas") {
+    regionList <- c("Cumberland (A)","Canterbury-Bankstown (A)","Blacktown (C)","Fairfield (C)",
+      "Liverpool (C)","Penrith (C)", "Parramatta (C)","Campbelltown (C) (NSW)",
+      "Georges River (A)", "Bayside (A)","Strathfield (A)", "Burwood (A)",
+      "Blue Mountains (C)", "Camden (A)","Canada Bay (A)","Central Coast (C) (NSW)",
+      "Hawkesbury (C)", "Hornsby (A)", "Hunters Hill (A)", "Inner West (A)",
+      "Ku-ring-gai (A)", "Lane Cove (A)", "Mosman (A)", "North Sydney (A)",
+      "Northern Beaches (A)", "Randwick (C)", "Ryde (C)", "Sutherland Shire (A)",
+      "Sydney (C)", "Waverley (A)", "Willoughby (C)", "Wollondilly (A)",
+      "Wollongong (C)","Woollahra (A)",
+      "Shellharbour (C)","Shoalhaven (C)", "Kiama (A)", "Lithgow (C)")
+    regionFolder <- "Metro_LGAs"
+  } else if (option == "syd_lgas_concern") {
     # Includes Blue Mountains, Central Coast, Shellharbour
-    regionList <- c("Bayside (A)", "Blacktown (C)", "Blue Mountains (C)",
-      "Burwood (A)", "Cabonne (A)", "Camden (A)", "Campbelltown (C) (NSW)",
-      "Canada Bay (A)", "Canterbury-Bankstown (A)", "Central Coast (C) (NSW)",
-      "Clarence Valley (A)", "Cumberland (A)", "Fairfield (C)", 
-      "Georges River (A)", "Glen Innes Severn (A)", "Goulburn Mulwaree (A)", 
-      "Hawkesbury (C)", "Hornsby (A)")
-    regionFolder <- "Sydney-metro"
-  } else if (option == "Regions") {
+    regionList <- c("Cumberland (A)","Canterbury-Bankstown (A)","Blacktown (C)","Fairfield (C)",
+      "Liverpool (C)","Penrith (C)", "Parramatta (C)","Campbelltown (C) (NSW)",
+      "Georges River (A)", "Bayside (A)","Strathfield (A)", "Burwood (A)")
+    regionFolder <- "Sydney_LGAs_Concern"
+  } else if (option == "Sydney-Other-LGAs") {
     regionList <- c("Armidale Regional (A)", "Bathurst Regional (A)"   )
     regionFolder <- "Regions"
-  } else if (option == "TestLGAs") {
-    regionList <- c("Campbelltown (C) (NSW)", "Fairfield (C)")
-    regionFolder <- "Test-LGAs"
   } else if (option == "postcode") { 
     regionList <- "postcodes" # Read in from postcode_suburb_name.csv
     regionFolder <- "Postcodes"
@@ -36,10 +36,8 @@ SpecifyRegions <- function(option = "all") {
     regionFolder <- NULL
     print("Enter regions and results folder manually")
   } else {
-   stop("Unknown regions option") 
+    stop("Unknown regions option") 
   }
   
   return(list(regionList, regionFolder))
 }
-  
-  
