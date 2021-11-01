@@ -89,6 +89,8 @@ plot_summary_NSW <- function(summary_results, x_lab = "Region",
     arrange(confirm) %>%
     mutate(region = factor(region, levels = .$region))
   
+  max_weekly_cases <- max(reported_weekly_cases$confirm)
+  
   reported_plot <- ggplot2::ggplot(reported_weekly_cases, 
     ggplot2::aes(y = region,
       colour = `Expected change in daily cases`)) +
@@ -112,14 +114,14 @@ plot_summary_NSW <- function(summary_results, x_lab = "Region",
     reported_plot <- reported_plot +
       ggplot2::scale_x_log10(
         labels = scales::comma,
-        limits = c(NA, ifelse(!missing(max_cases), max_cases * 7, NA)),
+        limits = c(NA, ifelse(!missing(max_cases), max_weekly_cases, NA)),
         oob = scales::squish
       )
   } else {
     reported_plot <- reported_plot +
       ggplot2::scale_x_continuous(
         labels = scales::comma,
-        limits = c(NA, ifelse(!missing(max_cases), max_cases * 7, NA)),
+        limits = c(NA, ifelse(!missing(max_cases), max_weekly_cases, NA)),
         oob = scales::squish
       )
   }
@@ -138,8 +140,8 @@ plot_summary_NSW <- function(summary_results, x_lab = "Region",
     inner_plot(rt_data) +
     ggplot2::guides(col = ggplot2::guide_legend(nrow = 2)) +
     ggplot2::labs(y = x_lab, x = "") +
-    ggplot2::expand_limits(x = c(0, min(max_rt, 4))) +
-    ggplot2::coord_cartesian(xlim = c(0, min(max_rt, 4))) +
+    ggplot2::expand_limits(x = c(0, min(max_rt, 8))) +
+    ggplot2::coord_cartesian(xlim = c(0, min(max_rt, 8))) +
     ggplot2::theme(
       axis.title.y = ggplot2::element_blank(),
       axis.text.y = ggplot2::element_blank()
