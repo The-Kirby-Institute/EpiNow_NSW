@@ -22,15 +22,25 @@ GetCases <- function(raw_data, data_option, start_date) {
   
   # Put raw data into right format
   if (data_option == "nsw_website") {
-    cases <- raw_data %>% 
-      select(date = notification_date, 
-        source = likely_source_of_infection, 
-        region = lga_name19,
-        postcode) %>%
-      mutate(import_status = ifelse(source == "Overseas", "imported", 
-        "local")) %>%
-      filter(import_status == "local", date >= start_date) %>%
-      select(-source, -import_status) 
+    
+    if ("likely_source_of_infection" %in% names(raw_data)) {
+      cases <- raw_data %>% 
+        select(date = notification_date, 
+          source = likely_source_of_infection, 
+          region = lga_name19,
+          postcode) %>%
+        mutate(import_status = ifelse(source == "Overseas", "imported", 
+          "local")) %>%
+        filter(import_status == "local", date >= start_date) %>%
+        select(-source, -import_status) 
+    } else {
+      cases <- raw_data %>% 
+        select(date = notification_date, 
+          region = lga_name19,
+          postcode) %>%
+        filter(date >= start_date) 
+    }
+
   } else if (data_option == "file") {
     # Need to tweak this to whatever file you are using
     # cases <- raw_data %>%
@@ -69,7 +79,6 @@ GetCases <- function(raw_data, data_option, start_date) {
     arrange(date)
   
   # Aggregate cases to get overall in Greater Sydney
-  
   greaterSydLGAs <- c("Bayside (A)", "Blacktown (C)", "Blue Mountains (C)", 
     "Burwood (A)", "Camden (A)", "Campbelltown (C) (NSW)", "Canada Bay (A)", 
     "Canterbury-Bankstown (A)", "Central Coast (C) (NSW)", 
@@ -99,9 +108,11 @@ GetCases <- function(raw_data, data_option, start_date) {
     arrange(date)
   
   # Sub-regional areas
-  regionalLGAs <- read_csv("data/list_regionalLHDs_LGA.csv", 
-    col_types = cols_only(grouplhd = "c", LHD_NAME = "c", LGA_NAME_2020 ="c")) %>%
-    rename(group = grouplhd, lhd = LHD_NAME, lga = LGA_NAME_2020)
+  regionalLGAs <- read_csv("data/list_regionalLHDs_LGA.csv",
+                           col_names = c('X', 'grouplhd', 'LHD_NAME', 'LGA_NAME_2020'),
+                           col_types = c('i', "c", "c", "c"),
+                           skip = 1) %>%
+    select(group = grouplhd, lhd = LHD_NAME, lga = LGA_NAME_2020)
   
   northernCases <- casesLga %>%
     filter(region %in% filter(regionalLGAs, group == "north_region_lhd")$lga) %>%
